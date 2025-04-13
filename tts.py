@@ -12,7 +12,7 @@ client = OpenAI()
 speech_file_path = Path(__file__).parent / "speech.mp3"
 
 with client.audio.speech.with_streaming_response.create(
-    speed = 1.8,
+    speed = 2.2,
     model = os.getenv("TTS_MODEL"),
     voice = os.getenv("TTS_VOICE"),
     input= """
