@@ -4,7 +4,25 @@ A technical implementation for converting textual content into multiple output m
 
 ## Technical Overview
 
-TTX (Text-to-Anything) implements a multi-modal content generation system that transforms input text into both audio narrations and visual assets. The system leverages OpenAI's APIs with optimized parameter configurations for high-quality output across different media types.
+TTX (Text-to-Anything) implements a multi-modal content generation system that transforms input text into various outputs, including:
+
+1. **Audio narrations** (Text-to-Speech)
+2. **Visual assets** (Text-to-Image)
+3. **Repository analysis** (GitHub-to-Text)
+4. **Content summaries** (Text-to-Text)
+
+The system leverages OpenAI's APIs with optimized parameter configurations for high-quality output across different media types.
+
+## Core Components
+
+### Text Processing Scripts
+
+| Script | Function | Description |
+|--------|----------|-------------|
+| `ttt.py` | Text-to-Text | Analyzes text files and generates concise summaries using OpenAI's GPT-4.1 |
+| `rtt.py` | Repo-to-Text | Fetches GitHub repository contents and consolidates files for analysis |
+| `tts.py` | Text-to-Speech | Converts text into natural-sounding narration via OpenAI's TTS models |
+| `tti.py` | Text-to-Image | Transforms text descriptions into visual representations using DALL-E 3 |
 
 ## Architectural Components
 
@@ -15,19 +33,27 @@ graph TD
     
     C --> |Audio Text| D1[TTS Preprocessor]
     C --> |Image Prompt| D2[TTI Preprocessor]
+    C --> |Summary Request| D3[TTT Preprocessor]
     
     D1 --> |Optimized Text| E1[OpenAI TTS API]
     D2 --> |Engineered Prompt| E2[OpenAI TTI API]
+    D3 --> |Formatted Query| E3[OpenAI Completion API]
+    
+    R1[GitHub Repository] --> R2[RTT Fetcher]
+    R2 --> |Consolidated Code| D3
     
     E1 --> |Audio Stream| F1[MP3 Encoder]
     E2 --> |Image Data| F2[Image Processor]
+    E3 --> |Generated Summary| F3[Text Processor]
     
     F1 --> G1[Audio Output]
     F2 --> G2[Image Output]
+    F3 --> G3[Summary Output]
     
     H[Environment Configuration] --> |API Keys| C
     H --> |TTS Parameters| E1
     H --> |TTI Parameters| E2
+    H --> |TTT Parameters| E3
     
     subgraph "Audio Pipeline"
     D1
@@ -41,12 +67,28 @@ graph TD
     F2
     end
     
+    subgraph "Text Pipeline"
+    D3
+    E3
+    F3
+    end
+    
+    subgraph "Repository Pipeline"
+    R1
+    R2
+    end
+    
     style D1 fill:#f96,stroke:#333,stroke-width:2px
     style E1 fill:#f96,stroke:#333,stroke-width:2px
     style F1 fill:#f96,stroke:#333,stroke-width:2px
     style D2 fill:#bbf,stroke:#33a,stroke-width:2px
     style E2 fill:#bbf,stroke:#33a,stroke-width:2px
     style F2 fill:#bbf,stroke:#33a,stroke-width:2px
+    style D3 fill:#bfb,stroke:#3a3,stroke-width:2px
+    style E3 fill:#bfb,stroke:#3a3,stroke-width:2px
+    style F3 fill:#bfb,stroke:#3a3,stroke-width:2px
+    style R1 fill:#fbb,stroke:#a33,stroke-width:2px
+    style R2 fill:#fbb,stroke:#a33,stroke-width:2px
 ```
 
 ## OpenAI SDK Integration
@@ -91,6 +133,62 @@ elif hasattr(image_data, 'b64_json') and image_data.b64_json:
         img_file.write(img_data)
 ```
 
+### Text-to-Text (TTT) Implementation
+
+```python
+def generate_summary(text):
+    """Generate a summary of the text using OpenAI API."""
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    
+    response = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[
+            {
+                "role": "developer",
+                "content": "You are a helpful assistant that summarizes technical documents. Your summary should capture the key points, concepts, and instructions in the document. Be concise but comprehensive."
+            },
+            {
+                "role": "user",
+                "content": f"Summarize the following text:\n\n{text}"
+            }
+        ]
+    )
+    
+    return response.choices[0].message.content
+```
+
+### Repository-to-Text (RTT) Implementation
+
+```python
+def fetch_github_repo(owner, repo, max_files=20, max_size=10000, token=None):
+    """Fetch GitHub repository files and consolidate for analysis"""
+    # API setup
+    base_url = f"https://api.github.com/repos/{owner}/{repo}/contents"
+    headers = {}
+    if token:
+        headers["Authorization"] = f"token {token}"
+    
+    # Recursive content retrieval (summarized)
+    # [implementation details omitted for brevity]
+    
+    # Format consolidated output with file separators
+    consolidated_text = f"""# GitHub Repository: {owner}/{repo}
+# Retrieved: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+# Files Analyzed: {len(repo_contents)}"""
+    
+    for file_path, content in repo_contents.items():
+        consolidated_text += f"""
+{'=' * 80}
+FILE: {file_path}
+{'=' * 80}
+
+{content}
+
+"""
+    
+    return consolidated_text, len(repo_contents)
+```
+
 ## API Parameters
 
 ### TTS Parameters (Audio Generation)
@@ -115,6 +213,25 @@ elif hasattr(image_data, 'b64_json') and image_data.b64_json:
 | `response_format` | string | Return data format | "url", "b64_json" |
 | `style` | string | Aesthetic style | "vivid", "natural" |
 
+### TTT Parameters (Text Summarization)
+
+| Parameter | Type | Description | Typical Values |
+|-----------|------|-------------|----------------|
+| `model` | string | Language model identifier | "gpt-4.1" |
+| `messages` | array | Conversation context | Role-based message objects |
+| `role` | string | Message attribution | "developer", "user", "assistant" |
+| `content` | string | Message content | Instruction text, source text |
+
+### RTT Parameters (Repository Fetching)
+
+| Parameter | Type | Description | Typical Values |
+|-----------|------|-------------|----------------|
+| `owner` | string | GitHub username/organization | "username" |
+| `repo` | string | Repository name | "repository-name" |
+| `max_files` | integer | File retrieval limit | 20 |
+| `max_size` | integer | Maximum file size in bytes | 10000 |
+| `token` | string | GitHub Personal Access Token | Environment variable |
+
 ## Protocol Implementation Notes
 
 ### TTS Pipeline Technical Details
@@ -131,6 +248,21 @@ elif hasattr(image_data, 'b64_json') and image_data.b64_json:
 - Single-stage for base64 responses (decode and save)
 - PNG output with dimensions based on vertical/horizontal content needs
 - Vertical formats (1024x1792) optimized for social media platforms
+
+### TTT Pipeline Technical Details
+
+- Synchronous completion request pattern
+- Developer role messaging for consistent instruction following
+- Optimized for technical content summarization
+- Direct console output with formatting for readability
+
+### RTT Pipeline Technical Details
+
+- Recursive directory traversal for repository exploration
+- Content filtering to exclude binary and large files
+- Structured text output with clear file demarcation
+- Token-based authentication for private repositories
+- Size and count limits for efficient processing
 
 ## Parameter Engineering
 
@@ -154,6 +286,14 @@ Image prompts follow a structured format with:
 - Background and foreground element specification
 - Format-specific optimizations (vertical/horizontal)
 
+### Text Summarization Engineering
+
+Summary prompts utilize a structured role-based approach:
+- Developer role for setting summarization parameters
+- Clear instruction specification for content emphasis
+- Document type identification for context-appropriate summarization
+- Technical vocabulary preservation for domain-specific summaries
+
 ## Configuration Reference
 
 ```
@@ -169,6 +309,10 @@ IMAGE_SIZE=1024x1792
 IMAGE_QUALITY=standard
 IMAGE_FORMAT=url
 IMAGE_STYLE=vivid
+
+# API Configuration
+OPENAI_API_KEY=your_openai_api_key
+GITHUB_TOKEN=your_github_personal_access_token
 ```
 
 ## License
